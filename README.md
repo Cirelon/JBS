@@ -16,11 +16,6 @@ By default, JBS uses the programs [here in progs.csv](progs.csv) and installs
 but you can easily change this by either modifying the default variables at the
 beginning of the script or giving the script one of these options:
 
-- `-r`: custom dotfiles repository (URL)
-- `-p`: custom programs list/dependencies (local file or URL)
-- `-a`: a custom AUR helper (must be able to install with `-S` unless you
-  change the relevant line in the script
-
 ### The `progs.csv` list
 
 JBS will parse the given programs list and install all given programs. Note
