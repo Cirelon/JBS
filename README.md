@@ -6,6 +6,7 @@ On an Arch-based distribution as root, run the following:
 
 ```
 curl -LO cirelon.com/jbs.sh
+chmod +x jbs.sh
 sh jbs.sh
 ```
 
