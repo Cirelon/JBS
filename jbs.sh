@@ -304,6 +304,12 @@ echo "%wheel ALL=(ALL) NOPASSWD: ALL" >/etc/sudoers.d/jbs-temp
 grep -q "ILoveCandy" /etc/pacman.conf || sed -i "/#VerbosePkgLists/a ILoveCandy" /etc/pacman.conf
 sed -Ei "s/^#(ParallelDownloads).*/\1 = 5/;/^#Color$/s/#//" /etc/pacman.conf
 
+# Enable multilib support in Pacman
+mline=$(grep -n "\\[multilib\\]" /etc/pacman.conf | cut -d: -f1)
+rline=$(($mline + 1))
+sed -i ''$mline's|#\[multilib\]|\[multilib\]|g' /etc/pacman.conf
+sed -i ''$rline's|#Include = /etc/pacman.d/mirrorlist|Include = /etc/pacman.d/mirrorlist|g' /etc/pacman.conf
+
 # Use all cores for compilation.
 sed -i "s/-j2/-j$(nproc)/;/^#MAKEFLAGS/s/^#//" /etc/makepkg.conf
 
@@ -318,7 +324,7 @@ installationloop
 # Install the dotfiles in the user's home directory, but remove .git dir and
 # other unnecessary files.
 putgitrepo "$dotfilesrepo" "/home/$name" "$repobranch"
-rm -rf "/home/$name/.git/" "/home/$name/README.md" "/home/$name/LICENSE" "/home/$name/FUNDING.yml"
+rm -rf "/home/$name/.git/" "/home/$name/README.md" "/home/$name/LICENSE"
 
 # Install vim plugins if not alread present.
 [ ! -f "/home/$name/.config/nvim/autoload/plug.vim" ] && vimplugininstall
