@@ -33,6 +33,7 @@ A,arkenfox-user.js,"provides hardened security settings for Firefox and Librewol
 ,noto-fonts-emoji,"is an emoji font."
 ,ntfs-3g,"allows accessing NTFS partitions."
 ,wireplumber,"is the audio system."
+,pipewire-audio,"is for audio support."
 ,pipewire-pulse,"gives pipewire compatibility with PulseAudio programs."
 ,pulsemixer,"is an audio controller."
 A,sc-im,"is an Excel-like terminal spreadsheet manager."
