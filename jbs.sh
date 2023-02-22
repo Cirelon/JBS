@@ -24,7 +24,7 @@ error() {
 
 welcomemsg() {
 	whiptail --title "Welcome!" \
-		--msgbox "Welcome to Jasper's Build Script!\\n\\nThis script will automatically install a fully-featured Linux desktop, which I use as my main machine.\\n\\n-Jasper" 10 60
+		--msgbox "Welcome to Jasper's Build Script!\\n\\nThis script will automatically setup my Linux Desktop." 10 60
 
 	whiptail --title "Important Note!" --yes-button "All ready!" \
 		--no-button "Return..." \
@@ -56,7 +56,7 @@ usercheck() {
 preinstallmsg() {
 	whiptail --title "Let's get this party started!" --yes-button "Let's go!" \
 		--no-button "No, nevermind!" \
-		--yesno "The rest of the installation will now be totally automated, so you can sit back and relax.\\n\\nIt will take some time, but when done, you can relax even more with your complete system.\\n\\nNow just press <Let's go!> and the system will begin installation!" 13 60 || {
+		--yesno "The rest of the installation will now be totally automated, so you can sit back and relax.\\n\\nNow just press <Let's go!> and the system will begin installation!" 13 60 || {
 		clear
 		exit 1
 	}
