@@ -32,7 +32,7 @@ welcomemsg() {
 }
 
 getuserandpass() {
-	# Prompts user for new username an password.
+	# Prompts user for new username and password.
 	name=$(whiptail --inputbox "First, please enter a name for the user account." 10 60 3>&1 1>&2 2>&3 3>&1) || exit 1
 	while ! echo "$name" | grep -q "^[a-z_][a-z0-9_-]*$"; do
 		name=$(whiptail --nocancel --inputbox "Username not valid. Give a username beginning with a letter, with only lowercase letters, - or _." 10 60 3>&1 1>&2 2>&3 3>&1)
@@ -82,24 +82,12 @@ refreshkeys() {
 		;;
 	*)
 		whiptail --infobox "Enabling Arch Repositories for more a more extensive software collection..." 7 40
-		if ! grep -q "^\[universe\]" /etc/pacman.conf; then
-			echo "[universe]
-Server = https://universe.artixlinux.org/\$arch
-Server = https://mirror1.artixlinux.org/universe/\$arch
-Server = https://mirror.pascalpuffke.de/artix-universe/\$arch
-Server = https://artixlinux.qontinuum.space/artixlinux/universe/os/\$arch
-Server = https://mirror1.cl.netactuate.com/artix/universe/\$arch
-Server = https://ftp.crifo.org/artix-universe/" >>/etc/pacman.conf
-			pacman -Sy --noconfirm >/dev/null 2>&1
-		fi
 		pacman --noconfirm --needed -S \
 			artix-keyring artix-archlinux-support >/dev/null 2>&1
-		for repo in extra community; do
-			grep -q "^\[$repo\]" /etc/pacman.conf ||
-				echo "[$repo]
+		grep -q "^\[extra\]" /etc/pacman.conf ||
+			echo "[extra]
 Include = /etc/pacman.d/mirrorlist-arch" >>/etc/pacman.conf
-		done
-		pacman -Sy >/dev/null 2>&1
+		pacman -Sy --noconfirm >/dev/null 2>&1
 		pacman-key --populate archlinux >/dev/null 2>&1
 		;;
 	esac
@@ -118,7 +106,7 @@ manualinstall() {
 			sudo -u "$name" git pull --force origin master
 		}
 	cd "$repodir/$1" || exit 1
-	sudo -u "$name" -D "$repodir/$1" \
+	sudo -u "$name" \
 		makepkg --noconfirm -si >/dev/null 2>&1 || return 1
 }
 
@@ -192,7 +180,6 @@ putgitrepo() {
 }
 
 vimplugininstall() {
-	# TODO remove shortcuts error message
 	# Installs vim plugins.
 	whiptail --infobox "Installing neovim plugins..." 7 60
 	mkdir -p "/home/$name/.config/nvim/autoload"
@@ -210,44 +197,6 @@ makeuserjs(){
 	[ ! -f "$arkenfox" ] && curl -sL "https://raw.githubusercontent.com/arkenfox/user.js/master/user.js" > "$arkenfox"
 	cat "$arkenfox" "$overrides" > "$userjs"
 	chown "$name:wheel" "$arkenfox" "$userjs"
-	# Install the updating script.
-	mkdir -p /usr/local/lib /etc/pacman.d/hooks
-	cp "/home/$name/.local/bin/arkenfox-auto-update" /usr/local/lib/
-	chown root:root /usr/local/lib/arkenfox-auto-update
-	chmod 755 /usr/local/lib/arkenfox-auto-update
-	# Trigger the update when needed via a pacman hook.
-	echo "[Trigger]
-Operation = Upgrade
-Type = Package
-Target = firefox
-Target = librewolf
-Target = librewolf-bin
-[Action]
-Description=Update Arkenfox user.js
-When=PostTransaction
-Depends=arkenfox-user.js
-Exec=/usr/local/lib/arkenfox-auto-update" > /etc/pacman.d/hooks/arkenfox.hook
-}
-
-installffaddons(){
-	addonlist="ublock-origin decentraleyes istilldontcareaboutcookies vim-vixen"
-	addontmp="$(mktemp -d)"
-	trap "rm -fr $addontmp" HUP INT QUIT TERM PWR EXIT
-	IFS=' '
-	sudo -u "$name" mkdir -p "$pdir/extensions/"
-	for addon in $addonlist; do
-		addonurl="$(curl --silent "https://addons.mozilla.org/en-US/firefox/addon/${addon}/" | grep -o 'https://addons.mozilla.org/firefox/downloads/file/[^"]*')"
-		file="${addonurl##*/}"
-		sudo -u "$name" curl -LOs "$addonurl" > "$addontmp/$file"
-		id="$(unzip -p "$file" manifest.json | grep "\"id\"")"
-		id="${id%\"*}"
-		id="${id##*\"}"
-		sudo -u "$name" mv "$file" "$pdir/extensions/$id.xpi"
-	done
-	# Fix a Vim Vixen bug with dark mode not fixed on upstream:
-	sudo -u "$name" mkdir -p "$pdir/chrome"
-	[ ! -f  "$pdir/chrome/userContent.css" ] && sudo -u "$name" echo ".vimvixen-console-frame { color-scheme: light !important; }
-#category-more-from-mozilla { display: none !important }" > "$pdir/chrome/userContent.css"
 }
 
 finalize() {
@@ -281,7 +230,7 @@ preinstallmsg || error "User exited."
 refreshkeys ||
 	error "Error automatically refreshing Arch keyring. Consider doing so manually."
 
-for x in curl ca-certificates base-devel git ntp zsh; do
+for x in curl ca-certificates base-devel git ntp zsh dash; do
 	whiptail --title "JBS Installation" \
 		--infobox "Installing \`$x\` which is required to install and configure other programs." 8 70
 	installpkg "$x"
@@ -298,7 +247,8 @@ adduserandpass || error "Error adding username and/or password."
 # Allow user to run sudo without password. Since AUR programs must be installed
 # in a fakeroot environment, this is required for all builds with AUR.
 trap 'rm -f /etc/sudoers.d/jbs-temp' HUP INT QUIT TERM PWR EXIT
-echo "%wheel ALL=(ALL) NOPASSWD: ALL" >/etc/sudoers.d/jbs-temp
+echo "%wheel ALL=(ALL) NOPASSWD: ALL
+Defaults:%wheel,root runcwd=*" >/etc/sudoers.d/jbs-temp
 
 # Make pacman colorful, concurrent downloads and Pacman eye-candy.
 grep -q "ILoveCandy" /etc/pacman.conf || sed -i "/#VerbosePkgLists/a ILoveCandy" /etc/pacman.conf
@@ -307,8 +257,10 @@ sed -Ei "s/^#(ParallelDownloads).*/\1 = 5/;/^#Color$/s/#//" /etc/pacman.conf
 # Use all cores for compilation.
 sed -i "s/-j2/-j$(nproc)/;/^#MAKEFLAGS/s/^#//" /etc/makepkg.conf
 
-manualinstall yay || error "Failed to install AUR helper."
+manualinstall $aurhelper || error "Failed to install AUR helper."
 
+# Make sure .*-git AUR packages get updated automatically.
+$aurhelper -Y --save --devel
 # The command that does all the installing. Reads the progs.csv file and
 # installs each needed program the way required. Be sure to run this only after
 # the user has been created and has priviledges to run sudo without a password
@@ -318,7 +270,7 @@ installationloop
 # Install the dotfiles in the user's home directory, but remove .git dir and
 # other unnecessary files.
 putgitrepo "$dotfilesrepo" "/home/$name" "$repobranch"
-rm -rf "/home/$name/.git/" "/home/$name/README.md" "/home/$name/LICENSE"
+rm -rf "/home/$name/.git/"
 
 # Install vim plugins if not alread present.
 [ ! -f "/home/$name/.config/nvim/autoload/plug.vim" ] && vimplugininstall
@@ -330,12 +282,16 @@ echo "blacklist pcspkr" >/etc/modprobe.d/nobeep.conf
 # Make zsh the default shell for the user.
 chsh -s /bin/zsh "$name" >/dev/null 2>&1
 sudo -u "$name" mkdir -p "/home/$name/.cache/zsh/"
+sudo -u "$name" mkdir -p "/home/$name/.config/mpd/playlists/"
 
+# Make dash the default #!/bin/sh symlink.
+ln -sfT /bin/dash /bin/sh >/dev/null 2>&1
 # dbus UUID must be generated for Artix runit.
 dbus-uuidgen >/var/lib/dbus/machine-id
 
 # Use system notifications for Brave on Artix
-echo "export \$(dbus-launch)" >/etc/profile.d/dbus.sh
+# Only do it when systemd is not present
+[ "$(readlink -f /sbin/init)" != "/usr/lib/systemd/systemd" ] && echo "export \$(dbus-launch)" >/etc/profile.d/dbus.sh
 
 # Enable tap to click
 [ ! -f /etc/X11/xorg.conf.d/40-libinput.conf ] && printf 'Section "InputClass"
@@ -357,12 +313,10 @@ profilesini="$browserdir/profiles.ini"
 # Start librewolf headless so it generates a profile. Then get that profile in a variable.
 sudo -u "$name" librewolf --headless >/dev/null 2>&1 &
 sleep 1
-profile="$(sed -n "/Default=.*.default-release/ s/.*=//p" "$profilesini")"
+profile="$(sed -n "/Default=.*.default-default/ s/.*=//p" "$profilesini")"
 pdir="$browserdir/$profile"
 
 [ -d "$pdir" ] && makeuserjs
-
-[ -d "$pdir" ] && installffaddons
 
 # Kill the now unnecessary librewolf instance.
 pkill -u "$name" librewolf
@@ -370,10 +324,12 @@ pkill -u "$name" librewolf
 # Allow wheel users to sudo with password and allow several system commands
 # (like `shutdown` to run without password).
 echo "%wheel ALL=(ALL:ALL) ALL" >/etc/sudoers.d/00-jbs-wheel-can-sudo
-echo "%wheel ALL=(ALL:ALL) NOPASSWD: /usr/bin/shutdown,/usr/bin/reboot,/usr/bin/systemctl suspend,/usr/bin/wifi-menu,/usr/bin/mount,/usr/bin/umount,/usr/bin/pacman -Syu,/usr/bin/pacman -Syyu,/usr/bin/pacman -Syyu --noconfirm,/usr/bin/loadkeys,/usr/bin/pacman -Syyuw --noconfirm,/usr/bin/pacman -S -u -y --config /etc/pacman.conf --,/usr/bin/pacman -S -y -u --config /etc/pacman.conf --" >/etc/sudoers.d/01-jbs-cmds-without-password
+echo "%wheel ALL=(ALL:ALL) NOPASSWD: /usr/bin/shutdown,/usr/bin/reboot,/usr/bin/systemctl suspend,/usr/bin/wifi-menu,/usr/bin/mount,/usr/bin/umount,/usr/bin/pacman -Syu,/usr/bin/pacman -Syyu,/usr/bin/pacman -Syyu --noconfirm,/usr/bin/loadkeys,/usr/bin/pacman -Syyuw --noconfirm,/usr/bin/pacman -S -y --config /etc/pacman.conf --,/usr/bin/pacman -S -y -u --config /etc/pacman.conf --" >/etc/sudoers.d/01-jbs-cmds-without-password
 echo "Defaults editor=/usr/bin/nvim" >/etc/sudoers.d/02-jbs-visudo-editor
 mkdir -p /etc/sysctl.d
 echo "kernel.dmesg_restrict = 0" > /etc/sysctl.d/dmesg.conf
 
+# Cleanup
+rm -f /etc/sudoers.d/jbs-temp
 # Last message! Install complete!
 finalize
